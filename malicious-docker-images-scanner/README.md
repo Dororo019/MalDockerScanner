@@ -14,7 +14,7 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
 ## 📸 Examples of GUI:
 | **Critical Risk Alert (Web UI)** | **Build Process (Terminal)** |
 |:---:|:---:|
-| ![Dashboard](dashboard_scan.png) | ![Terminal](terminal_build.png) |
+| ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) ![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
 
 ---
 
@@ -91,9 +91,9 @@ sudo usermod -aG docker $USER
 ```
 (Note: Falco must be installed separately following the official Falco docs).
 
-### 2. Clone & Install Project
+### 2. Clone & Install Project https://github.com/Dororo019/Hybrid-Framework-for-Detecting-Vulnerable-and-Malicious-Docker-Images
 ```bash
-git clone [https://github.com/AmritaCSN/malicious-docker-images-scanner.git](https://github.com/AmritaCSN/malicious-docker-images-scanner.git)
+git clone [https://github.com/Dororo019/MalDockerScanner.git](https://github.com/Dororo019/MalDockerScanner.git)
 cd malicious-docker-images-scanner
 ```
 ```bash

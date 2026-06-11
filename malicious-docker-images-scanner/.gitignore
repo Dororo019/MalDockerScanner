@@ -1,7 +1,44 @@
+#SECRETS & CREDENTIALS 
+.env
+.env.local
+database_credentials.txt
+secrets/
+*.pem
+*.key
+
+# PYTHON GENERATED FILES 
 __pycache__/
-*.pyc
-.venv/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+
+# VIRTUAL ENVIRONMENT (TOO LARGE) 
 venv/
-.idea/
-.vscode/
+env/
+
+#OUTPUT & TEMP FILES (REGENERATED)
+output/
+temp/
+logs/
 *.log
+
+# DEVELOPMENT TOOLS 
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# TESTS 
+.coverage
+htmlcov/
+.pytest_cache/
+
+# DOCKER 
+*.tar
+*.tar.gz
+
+# BACKUPS 
+*.bak
+backup/

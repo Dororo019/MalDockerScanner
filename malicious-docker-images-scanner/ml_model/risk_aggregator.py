@@ -1,103 +1,101 @@
-def calculate_risk_score(trivy_result, yara_result, clamav_result, falco_result):
+"""
+This program is for aggregating  per-vulnerability scores into a single image-level risk score.
+
+The aggregator takes the list of VulnerabilityContext objects scored by
+RiskScorer and produces an ImageRisk object that scan_orchestrator uses
+to compute the final risk score.
+
+Key design decisions (documented for thesis):
+
+1. Weighted max + mean blend: Pure mean underweights single critical CVEs (one 10.0 buried in 40 lows).
+    Pure max ignores breadth (40 lows is worse than 1 low).
+    Blend: 60% weighted max, 40% weighted mean.
+
+2. Volume penalty: more vulnerabilities means higher aggregate risk, even if each individual score is moderate. Capped at +20 points.
+
+3. Critical floor: if  ANY vulnerability is CRITICAL severity with a public exploit, the image cannot score below 60 (HIGH).
+"""
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+from ml_model.risk_scorer import RiskScorer, VulnerabilityContext
+
+
+@dataclass
+class ImageRisk:
+    """creating the result of aggregating all vulnerability scores for one image."""
+    image_name:      str
+    aggregated_risk: float   # 0–100, used by scan_orchestrator
+    risk_category:   str     # LOW / MEDIUM / HIGH / CRITICAL
+    vuln_count:      int
+    max_single:      float   # highest individual score
+    mean_score:      float   # mean of all individual scores
+
+
+def _category(score: float) -> str:
+    if score < 20:  return "LOW"
+    if score < 50:  return "MEDIUM"
+    if score < 80:  return "HIGH"
+    return "CRITICAL"
+
+
+class RiskAggregator:
     """
-     All scanner outputs are combined into:
-    1->risk_score (0 to 100)
-    2-> risk_level (LOW, MEDIUM, HIGH, CRITICAL)
-    3-> findings (list of strings for UI)
-    4-> high_priority (list of strings: critical/high issues only)
+    to aggregate per-vulnerability scores into an image-level risk. it will be used directly by a scan_orchestrator.run_full_scan().
     """
 
-    score = 0
-    findings = []
-    high_priority = []
+    def __init__(self):
+        self._scorer = RiskScorer()
 
-    # -------- TRIVY: vulnerabilities (CVEs) --------
-    if trivy_result.get('status') == 'success':
-        data = trivy_result.get('data', {})
-        total_vulns = 0
-        critical = 0
-        high = 0
+    def aggregate_image_risk(
+        self,
+        image_name: str,
+        contexts: List[VulnerabilityContext],
+    ) -> ImageRisk:
+        """
+        Score all vulnerabilities and aggregate into a single ImageRisk.If contexts is empty (no CVEs found), it will return a near-zero score .
+        """
+        if not contexts:
+            return ImageRisk(
+                image_name      = image_name,
+                aggregated_risk = 0.0,
+                risk_category   = "LOW",
+                vuln_count      = 0,
+                max_single      = 0.0,
+                mean_score      = 0.0,
+            )
 
-        try:
-            if 'Results' in data:
-                for r in data['Results']:
-                    vulns = r.get('Vulnerabilities', []) or []
-                    total_vulns += len(vulns)
-                    critical += len([v for v in vulns if v.get('Severity') == 'CRITICAL'])
-                    high += len([v for v in vulns if v.get('Severity') == 'HIGH'])
+        # Score each vulnerability
+        scores = [self._scorer.score(ctx) for ctx in contexts]
 
-            # scoring: each CRITICAL adds 10, each HIGH adds 5 (cap to avoid 1000)
-            score += min(critical * 10 + high * 5, 30)
+        max_score  = max(scores)
+        mean_score = sum(scores) / len(scores)
 
-            if total_vulns > 0:
-                findings.append(f"Trivy: {total_vulns} vulnerabilities (CRITICAL={critical}, HIGH={high})")
-                if critical > 0 or high > 3:
-                    high_priority.append("Trivy: Fix critical/high vulnerabilities before deployment")
-            else:
-                findings.append("Trivy: No known vulnerabilities found")
-        except Exception:
-            findings.append("Trivy: it cannot analyze vulnerabilities (parsing error)")
-    elif trivy_result.get('status') == 'error':
-        findings.append(f"Trivy: Scan error - {trivy_result.get('message')}")
+        # Blend: 60% highest single score + 40% mean
+        blended = (max_score * 0.60) + (mean_score * 0.40)
 
-    # -------- YARA: malware signatures --------
-    if yara_result.get('status') == 'success':
-        if yara_result.get('detected'):
-            score += 70
-            findings.append("YARA: MALWARE signature(s) detected")
-            high_priority.append("YARA: Remove or replace image – malware signature present")
-        else:
-            findings.append("YARA: No malware signatures found")
-    elif yara_result.get('status') == 'error':
-        findings.append(f"YARA: Scan error - {yara_result.get('message')}")
+        # Volume penalty: more CVEs = more attack surface
+        # +0.5 per vuln up to a maximum of +20
+        volume_penalty = min(20.0, len(scores) * 0.5)
 
-    # -------- CLAMAV: antivirus --------
-    if clamav_result.get('status') == 'success':
-        if clamav_result.get('infected'):
-            score += 70
-            findings.append("ClamAV: Infected files detected")
-            high_priority.append("ClamAV: Infected files – image must NOT be used")
-        else:
-            findings.append("ClamAV: Image is clean (no infected files)")
-    elif clamav_result.get('status') == 'error':
-        findings.append(f"ClamAV: Scan error - {clamav_result.get('message')}")
+        raw = blended + volume_penalty
 
-    # -------- FALCO: runtime behavior --------
-    if falco_result.get('status') == 'success':
-        alerts = falco_result.get('alert_count', 0)
-        if alerts > 5:
-            extra = min(alerts * 3, 25)
-            score += extra
-            findings.append(f"Falco: {alerts} suspicious runtime alerts")
-            high_priority.append("Falco: Investigate suspicious container behavior before deployment")
-        elif alerts > 0:
-            findings.append(f"Falco: {alerts} minor runtime alerts")
-        else:
-            findings.append("Falco: No runtime anomalies detected")
-    elif falco_result.get('status') == 'warning':
-        findings.append(f"Falco: Warning - {falco_result.get('message')}")
-    elif falco_result.get('status') == 'error':
-        findings.append(f"Falco: Error - {falco_result.get('message')}")
+        # Critical floor: if any CVE is critical + public exploit -> floor of 60
+        has_critical_exploit = any(
+            ctx.cvss_score >= 9.0 and ctx.public_exploit
+            for ctx in contexts
+        )
+        if has_critical_exploit:
+            raw = max(raw, 60.0)
 
-    # -------- Normalize and assign level --------
-    if score < 0:
-        score = 0
-    if score > 100:
-        score = 100
+        aggregated = max(0.0, min(raw, 100.0))
 
-    if score >= 80:
-        level = 'CRITICAL'
-    elif score >= 50:
-        level = 'HIGH'
-    elif score >= 20:
-        level = 'MEDIUM'
-    else:
-        level = 'LOW'
-
-    return {
-        'risk_score': score,
-        'risk_level': level,
-        'findings': findings,
-        'high_priority': high_priority
-    }
-
+        return ImageRisk(
+            image_name      = image_name,
+            aggregated_risk = round(aggregated, 2),
+            risk_category   = _category(aggregated),
+            vuln_count      = len(contexts),
+            max_single      = round(max_score, 2),
+            mean_score      = round(mean_score, 2),
+        )

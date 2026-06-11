@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MalDocker Image Scanner — Security Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0a0c10;--surface:#111520;--surface2:#161b28;--surface3:#1d2435;
+  --border:#1e2d45;--border2:#253550;
+  --accent:#00e5ff;--accent2:#ff4d6d;--accent3:#a78bfa;--accent4:#34d399;
+  --text:#e2e8f0;--text2:#8898aa;--text3:#4a5568;
+  --crit:#ff4d6d;--high:#fb923c;--med:#fbbf24;--low:#34d399;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-display:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-display);overflow-x:hidden}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* LAYOUT */
+.shell{display:flex;height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+/* SIDEBAR */
+.logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.logo-mark{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.logo-title{font-size:18px;font-weight:800;line-height:1.1}
+.logo-title span{color:var(--accent)}
+.nav{padding:12px 0;flex:1}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:all .15s;color:var(--text2);font-size:14px;font-weight:600;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);background:rgba(0,229,255,.05);border-left-color:var(--accent)}
+.nav-icon{width:18px;text-align:center;flex-shrink:0}
+.sidebar-bottom{padding:16px 20px;border-top:1px solid var(--border)}
+.week-badge{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:var(--accent3);font-size:11px;font-family:var(--font-mono);padding:6px 10px;border-radius:6px;text-align:center;letter-spacing:1px}
+
+/* TOPBAR */
+.topbar{padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:20px;font-weight:700}
+.topbar-meta{font-size:12px;font-family:var(--font-mono);color:var(--text2)}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent4);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* CONTENT */
+.content{padding:24px 28px;flex:1}
+.page{display:none}.page.active{display:block}
+
+/* STAT CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::before{content:'';position:absolute;inset:0;opacity:.04;pointer-events:none}
+.stat-card.crit::before{background:var(--crit)} .stat-card.crit .stat-val{color:var(--crit)}
+.stat-card.high::before{background:var(--high)} .stat-card.high .stat-val{color:var(--high)}
+.stat-card.med::before{background:var(--med)}  .stat-card.med .stat-val{color:var(--med)}
+.stat-card.low::before{background:var(--low)}  .stat-card.low .stat-val{color:var(--low)}
+.stat-card.acc::before{background:var(--accent)} .stat-card.acc .stat-val{color:var(--accent)}
+.stat-label{font-size:11px;color:var(--text2);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.stat-val{font-size:32px;font-weight:800;line-height:1;font-family:var(--font-mono)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--font-mono)}
+
+/* SCAN INPUT */
+.scan-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:24px}
+.scan-box-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scan-row{display:flex;gap:10px;flex-wrap:wrap}
+.scan-input{flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:border-color .2s}
+.scan-input:focus{border-color:var(--accent)}
+.btn{padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-display);font-weight:700;font-size:13px;transition:all .15s;display:flex;align-items:center;gap:7px}
+.btn-primary{background:var(--accent);color:#0a0c10}
+.btn-primary:hover{background:#00c4db;transform:translateY(-1px)}
+.btn-primary:active{transform:none}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);background:var(--surface2)}
+.btn-danger{background:var(--crit);color:#fff}
+.btn-danger:hover{background:#e03050}
+
+/* SCAN RESULT */
+.result-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:24px;display:none;animation:fadeUp .3s ease}
+.result-panel.show{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.result-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.result-image-name{font-family:var(--font-mono);font-size:15px;font-weight:600}
+.risk-badge{padding:6px 14px;border-radius:20px;font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:1px}
+.risk-badge.CRITICAL{background:rgba(255,77,109,.15);color:var(--crit);border:1px solid rgba(255,77,109,.3)}
+.risk-badge.HIGH{background:rgba(251,146,60,.15);color:var(--high);border:1px solid rgba(251,146,60,.3)}
+.risk-badge.MEDIUM{background:rgba(251,191,36,.15);color:var(--med);border:1px solid rgba(251,191,36,.3)}
+.risk-badge.LOW{background:rgba(52,211,153,.15);color:var(--low);border:1px solid rgba(52,211,153,.3)}
+
+.score-arc{text-align:center;margin-bottom:20px}
+.score-circle{width:110px;height:110px;border-radius:50%;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid var(--border);position:relative;margin:0 auto}
+.score-num{font-family:var(--font-mono);font-size:28px;font-weight:800}
+.score-lbl{font-size:10px;color:var(--text2);font-family:var(--font-mono);letter-spacing:1px}
+
+.engines-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.engine-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.engine-name{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:8px}
+.engine-val{font-size:22px;font-weight:800;font-family:var(--font-mono)}
+.engine-sub{font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-mono)}
+.engine-card.trivy .engine-val{color:var(--high)}
+.engine-card.clamav .engine-val{color:var(--crit)}
+.engine-card.yara .engine-val{color:var(--accent3)}
+.engine-card.falco .engine-val{color:var(--accent)}
+
+/* SCAN LOGS TABLE */
+.section-title{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.section-title span{font-size:11px;font-family:var(--font-mono);color:var(--text3);text-transform:none;letter-spacing:0;font-weight:400}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 16px;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;color:var(--text2);text-align:left;background:var(--surface2);border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+td{padding:11px 16px;font-size:13px;font-family:var(--font-mono)}
+.td-image{color:var(--text);font-weight:600}
+.td-score{font-weight:700}
+.td-time{color:var(--text3);font-size:11px}
+.td-action .btn{padding:5px 12px;font-size:11px}
+.empty-state{padding:40px;text-align:center;color:var(--text3);font-family:var(--font-mono);font-size:13px}
+
+/* DETAIL MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:min(800px,95vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;animation:modalIn .25s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700;font-family:var(--font-mono)}
+.modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+
+.detail-section{margin-bottom:22px}
+.detail-section-title{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(0,229,255,.15)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.detail-item{background:var(--surface2);border-radius:6px;padding:10px 14px}
+.detail-item-label{font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.detail-item-val{font-size:14px;font-weight:600;font-family:var(--font-mono)}
+
+.rule-list{display:flex;flex-wrap:wrap;gap:6px}
+.rule-chip{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);color:var(--accent3);font-size:11px;font-family:var(--font-mono);padding:3px 10px;border-radius:4px}
+.sig-chip{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.25);color:var(--crit);font-size:11px;font-family:var(--font-mono);padding:3px 10px;border-radius:4px}
+
+/* PROGRESS BAR */
+.progress-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:3px;transition:width 1s ease}
+
+/* DATASET PAGE */
+.dataset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.dataset-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;transition:all .2s;cursor:pointer}
+.dataset-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,229,255,.08)}
+.dataset-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dataset-card-name{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text)}
+.label-badge{font-size:10px;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;font-weight:700}
+.label-badge.malicious{background:rgba(255,77,109,.15);color:var(--crit);border:1px solid rgba(255,77,109,.3)}
+.label-badge.clean{background:rgba(52,211,153,.15);color:var(--low);border:1px solid rgba(52,211,153,.3)}
+.dataset-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:10px}
+.dataset-cat{font-size:10px;font-family:var(--font-mono);color:var(--accent3);text-transform:uppercase;letter-spacing:1px}
+
+/* LOADING SPINNER */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,229,255,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px 18px;font-family:var(--font-mono);font-size:12px;animation:toastIn .3s ease;min-width:220px}
+.toast.success{border-left:3px solid var(--low)}
+.toast.error{border-left:3px solid var(--crit)}
+.toast.info{border-left:3px solid var(--accent)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* SCANNING OVERLAY */
+.scanning-overlay{position:absolute;inset:0;background:rgba(10,12,16,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;border-radius:12px;z-index:10;backdrop-filter:blur(2px)}
+.scanning-overlay.active{display:flex}
+.scanning-text{font-family:var(--font-mono);font-size:13px;color:var(--accent);letter-spacing:2px}
+.scan-stages{display:flex;gap:16px;margin-top:8px}
+.stage{font-family:var(--font-mono);font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;transition:color .3s}
+.stage.active-stage{color:var(--accent)}
+.stage.done-stage{color:var(--accent4)}
+
+/* SCALE BADGE(weekly_update)*/
+.w8-callout{background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(0,229,255,.05));border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:14px}
+.w8-icon{font-size:24px}
+.w8-text{font-size:12px;color:var(--text2);line-height:1.6}
+.w8-text strong{color:var(--accent3);font-family:var(--font-mono)}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .engines-grid{grid-template-columns:repeat(2,1fr)}
+  .detail-grid{grid-template-columns:1fr}
+}
+
+/* SERVER STATUS INDICATOR */
+.server-status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;font-family:var(--font-mono);font-size:11px;margin-top:10px;border:1px solid var(--border);transition:all .4s}
+.server-status.online{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);color:var(--accent4)}
+.server-status.offline{background:rgba(255,77,109,.08);border-color:rgba(255,77,109,.3);color:var(--crit)}
+.server-status.checking{background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.2);color:var(--accent)}
+.srv-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.server-status.online  .srv-dot{background:var(--accent4);box-shadow:0 0 6px var(--accent4)}
+.server-status.offline .srv-dot{background:var(--crit)}
+.server-status.checking .srv-dot{background:var(--accent);animation:pulse 1s infinite}
+.mode-label{font-size:10px;opacity:.7;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">// MALDOCKER</div>
+    <div class="logo-title">Docker<br><span>Image</span><br><span>Security</span><br>Scanner</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="nav('dashboard')">
+      <span class="nav-icon">⬡</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="nav('scan')">
+      <span class="nav-icon">◈</span> Run Scan
+    </div>
+    <div class="nav-item" onclick="nav('logs')">
+      <span class="nav-icon">≡</span> Scan Logs
+    </div>
+    <div class="nav-item" onclick="nav('dataset')">
+      <span class="nav-icon">◫</span> Dataset
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="week-badge">MalDocker Scanner<br>Static · Dynamic · ML</div>
+    <div class="server-status checking" id="srv-status">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="srv-dot"></span>
+          <span id="srv-label">Checking...</span>
+        </div>
+        <div class="mode-label" id="srv-mode">Connecting to server</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-title" id="page-title">MALICIOUS CONTAINER IMAGES SCANNER</div>
+    <div class="topbar-meta">
+      <span class="status-dot"></span>
+      Engines: Trivy · Syft · ClamAV · YARA · Dockle · Falco &nbsp;|&nbsp;
+      <span id="clock" style="font-family:var(--font-mono)"></span>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="w8-callout">
+        <div class="w8-icon">🛡️</div>
+        <div class="w8-text">
+          <strong>MalDocker Scanner</strong> A hybrid DevSecOps platform designed to solve the "alert fatigue" of traditional scanners. By orchestrating, a hybrid 6-engine framework (Trivy · ClamAV · YARA · Syft · Dockle· Falco ), our framework uses a Context-Aware Risk Model to mathematically refine threat data. We transform raw CVE lists into a single, highly accurate 0–100 Risk Score, ensuring you focus on real-world exploits, not just theoretical vulnerabilities.</strong><br>
+           · 26 March 2026
+        </div>
+      </div>
+
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card acc">
+          <div class="stat-label">Total Scans</div>
+          <div class="stat-val" id="st-total">0</div>
+          <div class="stat-sub">all time</div>
+        </div>
+        <div class="stat-card crit">
+          <div class="stat-label">Critical</div>
+          <div class="stat-val" id="st-crit">0</div>
+          <div class="stat-sub">risk level</div>
+        </div>
+        <div class="stat-card high">
+          <div class="stat-label">High</div>
+          <div class="stat-val" id="st-high">0</div>
+          <div class="stat-sub">risk level</div>
+        </div>
+        <div class="stat-card med">
+          <div class="stat-label">Medium</div>
+          <div class="stat-val" id="st-med">0</div>
+          <div class="stat-sub">risk level</div>
+        </div>
+        <div class="stat-card low">
+          <div class="stat-label">Low</div>
+          <div class="stat-val" id="st-low">0</div>
+          <div class="stat-sub">risk level</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Score</div>
+          <div class="stat-val" style="color:var(--accent3)" id="st-avg">—</div>
+          <div class="stat-sub">risk score</div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        Recent Scans
+        <span id="recent-count">0 results</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Image</th><th>Risk Score</th><th>Category</th>
+            <th>Trivy</th><th>ClamAV</th><th>YARA</th><th>Falco</th>
+            <th>Duration</th><th>Time</th><th>Report</th>
+          </tr></thead>
+          <tbody id="dashboard-tbody">
+            <tr><td colspan="10" class="empty-state">No scans yet. Run a scan to see results here.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!--  SCAN PAGE  -->
+    <div class="page" id="page-scan">
+      <div class="scan-box" style="position:relative">
+        <div class="scan-box-title">🔍 Scan a Docker Image</div>
+        <div class="scan-row">
+          <input class="scan-input" id="scan-input" type="text" placeholder="e.g. ubuntu:18.04, python:3.6-slim, or custom:tag" autocomplete="off"/>
+          <button class="btn btn-primary" id="scan-btn" onclick="runScan()">
+            <span id="scan-btn-text">▶ Scan</span>
+          </button>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap" id="quick-btns">
+          <span style="font-size:11px;color:var(--text3);font-family:var(--font-mono);align-self:center">Quick:</span>
+        </div>
+        <div class="scanning-overlay" id="scanning-overlay">
+          <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
+          <div class="scanning-text" id="scanning-text">SCANNING…</div>
+          <div class="scan-stages">
+            <div class="stage" id="stage-trivy">⬡ TRIVY</div>
+            <div class="stage" id="stage-falco">⬡ SYFT</div>
+            <div class="stage" id="stage-falco">⬡ DOCKLE </div>
+            <div class="stage" id="stage-clamav">⬡ CLAMAV</div>
+            <div class="stage" id="stage-yara">⬡ YARA</div>
+            <div class="stage" id="stage-falco">⬡ FALCO</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-panel" id="result-panel">
+        <div class="result-header">
+          <div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-bottom:4px">SCAN RESULT</div>
+            <div class="result-image-name" id="res-image">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="risk-badge" id="res-badge">—</div>
+            <button class="btn btn-ghost" style="font-size:12px" id="res-detail-btn" onclick="openModalFromResult()">📋 Full Report</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:20px">
+          <div class="score-circle" id="score-circle">
+            <div class="score-num" id="res-score">—</div>
+            <div class="score-lbl">RISK</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--text2);font-family:var(--font-mono);margin-bottom:6px">RISK SCORE</div>
+            <div class="progress-bar" style="height:10px">
+              <div class="progress-fill" id="res-progress" style="width:0%;background:var(--accent)"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--font-mono);color:var(--text3);margin-top:4px">
+              <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="engines-grid">
+          <div class="engine-card trivy">
+            <div class="engine-name">Trivy</div>
+            <div class="engine-val" id="res-trivy">—</div>
+            <div class="engine-sub">vulnerabilities</div>
+          </div>
+          <div class="engine-card clamav">
+            <div class="engine-name">ClamAV</div>
+            <div class="engine-val" id="res-clamav">—</div>
+            <div class="engine-sub">malware hits</div>
+          </div>
+          <div class="engine-card yara">
+            <div class="engine-name">YARA</div>
+            <div class="engine-val" id="res-yara">—</div>
+            <div class="engine-sub">rule matches</div>
+          </div>
+          <div class="engine-card falco">
+            <div class="engine-name">Falco</div>
+            <div class="engine-val" id="res-falco">—</div>
+            <div class="engine-sub">runtime alerts</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:4px" id="res-duration"></div>
+      </div>
+    </div>
+
+    <!-- LOGS PAGE  -->
+    <div class="page" id="page-logs">
+      <div class="section-title">
+        Scan History
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 12px" onclick="loadLogs()">↺ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Image</th><th>Risk Score</th><th>Category</th>
+            <th>Trivy</th><th>ClamAV</th><th>YARA</th><th>Falco</th>
+            <th>Duration</th><th>Timestamp</th><th>Report</th>
+          </tr></thead>
+          <tbody id="logs-tbody">
+            <tr><td colspan="10" class="empty-state">No scans logged yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DATASET PAGE  -->
+    <div class="page" id="page-dataset">
+      <div class="section-title">
+        Malicious Docker Images
+        <span>Labelled dataset for ML training</span>
+      </div>
+      <div class="dataset-grid" id="dataset-grid">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-image-name">Scan Report</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="risk-badge" id="modal-badge">—</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+//STATE 
+let currentResult = null;
+let scanLogs = [];
+
+//NAV 
+const PAGE_TITLES = {dashboard:'Dashboard',scan:'Run Scan',logs:'Scan History',dataset:'Image Dataset'};
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if(n.textContent.toLowerCase().includes(page.substring(0,4))) n.classList.add('active');
+  });
+  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  if(page === 'logs') loadLogs();
+  if(page === 'dataset') loadDataset();
+  if(page === 'dashboard') loadDashboard();
+}
+
+//CLOCK 
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+//TOAST 
+function toast(msg, type='info', dur=3000) {
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(20px)'; t.style.transition='all .3s'; setTimeout(()=>t.remove(), 300); }, dur);
+}
+
+//API 
+//Server URL:  render jakkalode uni web addr ong.gen
+//Indiba blank ong.ode , use the relative paths ( indioba it'll work only when served by Flask directly)
+//When set to Render URL, GitHub Pages can reach the Flask server
+const RENDER_URL = '';   // e.g. 'https://maldocker-scanner.onrender.com'
+
+//The Connection state 
+let _serverOnline = null;  // null=unknown, true=online, false=offline
+
+function _setStatus(state) {
+  const el = document.getElementById('srv-status');
+  const lbl = document.getElementById('srv-label');
+  const mode = document.getElementById('srv-mode');
+  if (!el) return;
+  el.className = 'server-status ' + state;
+  if (state === 'online') {
+    lbl.textContent = 'Server online';
+    mode.textContent = 'Live data · Flask + PostgreSQL';
+  } else if (state === 'offline') {
+    lbl.textContent = 'Offline mode';
+    mode.textContent = 'Mock data · no server needed';
+  } else {
+    lbl.textContent = 'Checking...';
+    mode.textContent = 'Connecting to server';
+  }
+}
+
+async function _checkServer() {
+  const base = RENDER_URL || '';
+  try {
+    const r = await fetch(base + '/health', {method:'GET', signal:AbortSignal.timeout(3000)});
+    if (r.ok) {
+      _serverOnline = true;
+      _setStatus('online');
+      return true;
+    }
+  } catch(e) {}
+  _serverOnline = false;
+  _setStatus('offline');
+  return false;
+}
+
+//Check server once on page load, then every 30 seconds
+_checkServer();
+setInterval(_checkServer, 30000);
+
+async function api(path, method='GET', body=null) {
+  const base = RENDER_URL || '';
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(base + path, opts);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    //Mark online if we got a real response
+    if (_serverOnline !== true) { _serverOnline = true; _setStatus('online'); }
+    return data;
+  } catch(e) {
+    //Server not reachable — use mock data
+    if (_serverOnline !== false) { _serverOnline = false; _setStatus('offline'); }
+    return mockApiResponse(path, method, body);
+  }
+}
+
+//MOCK API (standalone demo)
+function mockHash(s) {
+  let h = 0;
+  for(let i=0;i<s.length;i++) h = Math.imul(31,h)+s.charCodeAt(i)|0;
+  return Math.abs(h);
+}
+function mockScan(image) {
+  const seed = mockHash(image);
+  const rng = (min,max)=>min+((seed*2654435761+min)%((max-min+1)||1));
+  const trivy = rng(0,40), clamav=rng(0,3), yara=rng(0,5), falco=rng(0,4);
+  const dockle_fatal = rng(0,3), dockle_warn = rng(0,5);
+  const syft_pkgs = rng(40,280), syft_lic = seed%4===0 ? 1 : 0;
+  const boost = (clamav>0?10:0)+(yara>0?5:0)+(falco>0?15:0)
+              + Math.min(24,dockle_fatal*8)+Math.min(9,dockle_warn*3)
+              + (syft_lic>0?6:0)+(syft_pkgs>200?4:0);
+  const score = Math.min(100, Math.round(((trivy*1.1+boost)*0.51)*10)/10);
+  const cat = score<20?'LOW':score<50?'MEDIUM':score<80?'HIGH':'CRITICAL';
+  const dur = Math.round((4+seed%14)*100)/100;
+  const sid = `scan_${Date.now()}_${image.replace(/[:/]/g,'_')}`;
+  const licenses = ['MIT','Apache-2.0','BSD-3-Clause','ISC'];
+  const riskLic = seed%4===0 ? ['GPL-2.0'] : [];
+  return {
+    status:'completed', image_name:image, scan_id:sid,
+    timestamp:new Date().toISOString(),
+    engines:{
+      trivy:{status:'success',duration:Math.round(dur*.25*100)/100,vulnerabilities:trivy},
+      syft:{status:'success',duration:Math.round(dur*.15*100)/100,
+            total_packages:syft_pkgs,os_packages:Math.floor(syft_pkgs*.6),
+            lib_packages:Math.floor(syft_pkgs*.4),
+            high_risk_licenses:riskLic,
+            unique_licenses:licenses.slice(0,rng(2,4))},
+      clamav:{status:'success',duration:Math.round(dur*.2*100)/100,hits:clamav},
+      yara:{status:'success',duration:Math.round(dur*.15*100)/100,matches:yara},
+      dockle:{status:'success',duration:Math.round(dur*.1*100)/100,
+              fatal:dockle_fatal,warn:dockle_warn,info:rng(0,3),pass:rng(10,22)},
+      falco:{status:'success',duration:Math.round(dur*.15*100)/100,alerts:falco},
+    },
+    final_risk_score:score, risk_category:cat, scan_duration:dur,
+    trivy_detail:{critical:Math.floor(trivy/4),high:Math.floor(trivy/3),medium:Math.floor(trivy/2),low:trivy},
+    falco_detail:{critical:Math.floor(falco/2),error:falco,warning:rng(0,3),notice:rng(0,5)},
+    yara_rules_matched: Array.from({length:yara},(_,i)=>`rule_${(seed+i)%50+1}`),
+    clamav_signatures: Array.from({length:clamav},(_,i)=>`Malware.Generic.${(seed+i)%900+100}`),
+    dockle_findings: Array.from({length:dockle_fatal},(_,i)=>({
+      code:`CIS-DI-000${i+1}`,level:'FATAL',
+      title:['Container runs as root','Sensitive ENV variable detected','SETUID/SETGID bits found'][i%3]
+    })),
+    sbom_summary:{total_packages:syft_pkgs, high_risk_licenses:riskLic},
+  };
+}
+const DATASET_DATA = [
+  //Synthetic malware test images (lab-built) 
+  {name:"malware_test:behavior",  dockerfile:"Dockerfile.behavior",  label:"malicious", category:"behavior",      description:"Simulates suspicious process behavior at runtime"},
+  {name:"malware_test:clean",     dockerfile:"Dockerfile.clean",     label:"clean",     category:"baseline",      description:"Clean baseline reference image"},
+  {name:"malware_test:poisoned",  dockerfile:"Dockerfile.poisoned",  label:"malicious", category:"supply-chain",  description:"Supply-chain poisoned dependencies"},
+  {name:"malware_test:signature", dockerfile:"Dockerfile.signature", label:"malicious", category:"malware",       description:"Known ClamAV/YARA signature embedded"},
+  {name:"malware_test:vuln",      dockerfile:"Dockerfile.vuln",      label:"malicious", category:"cve",           description:"Single high-severity CVE pinned"},
+  {name:"malware_test:vulnerable",dockerfile:"Dockerfile.vulnerable",label:"malicious", category:"cve",           description:"Multiple unpatched vulnerabilities stacked"},
+  {name:"malware_test:miner",     dockerfile:"Dockerfile.miner",     label:"malicious", category:"malware",       description:"Cryptominer payload (XMRig pattern)"},
+  {name:"malware_test:backdoor",  dockerfile:"Dockerfile.backdoor",  label:"malicious", category:"malware",       description:"Reverse-shell backdoor on container start"},
+  {name:"malware_test:exfil",     dockerfile:"Dockerfile.exfil",     label:"malicious", category:"behavior",      description:"Data exfiltration over outbound HTTPS"},
+
+  //Real-world base images: EOL / vulnerable 
+  {name:"ubuntu:18.04",   dockerfile:null, label:"clean",     category:"baseline", description:"Legacy Ubuntu 18.04 LTS"},
+  {name:"python:3.6-slim",dockerfile:null, label:"malicious", category:"cve",      description:"EOL Python 3.6 with known CVEs"},
+  {name:"node:10-alpine", dockerfile:null, label:"malicious", category:"cve",      description:"EOL Node 10 with supply-chain risk"},
+  {name:"python:3.11-slim",dockerfile:null,label:"malicious", category:"cve",      description:"Older Python 3.11 with library CVEs"},
+  {name:"nginx:1.14",     dockerfile:null, label:"malicious", category:"cve",      description:"Old nginx 1.14 with known issues"},
+
+  //Real-world base images: relatively clean 
+  {name:"ubuntu:20.04",   dockerfile:null, label:"clean",     category:"baseline", description:"Ubuntu 20.04 LTS"},
+  {name:"debian:10",      dockerfile:null, label:"clean",     category:"baseline", description:"Debian 10 buster, stable base"},
+  {name:"redis:5.0",      dockerfile:null, label:"clean",     category:"baseline", description:"Redis 5.0, minimal vuln surface"},
+  {name:"redis:7-alpine", dockerfile:null, label:"clean",     category:"baseline", description:"Modern Redis 7 on Alpine"},
+  {name:"node:20-alpine", dockerfile:null, label:"clean",     category:"baseline", description:"Current Node 20 on Alpine"},
+  {name:"nginx:alpine",   dockerfile:null, label:"clean",     category:"baseline", description:"Current nginx on Alpine"},
+];
+const _store = {};
+function mockApiResponse(path, method, body) {
+  if(path==='/api/scan/sync' && method==='POST') {
+    const r = mockScan(body.image_name);
+    _store[r.scan_id] = r;
+    scanLogs.unshift(r);
+    return r;
+  }
+  if(path==='/api/scans') return scanLogs.slice(0,50);
+  if(path.startsWith('/api/scan/')) return _store[path.split('/').pop()] || {error:'not found'};
+  if(path==='/api/dataset') return DATASET_DATA;
+  if(path==='/api/stats') {
+    const cats={CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+    let sum=0;
+    scanLogs.forEach(s=>{cats[s.risk_category]=(cats[s.risk_category]||0)+1;sum+=s.final_risk_score});
+    return {total:scanLogs.length,...cats,avg_score:scanLogs.length?Math.round(sum/scanLogs.length*10)/10:0};
+  }
+  return {};
+}
+
+//SCAN 
+const QUICK_IMAGES = ['alpine:latest','ubuntu:20.04','python:3.6-slim','malware_test:vuln','malware_test:backdoor','redis:7-alpine', 'infected-eicar:latest'];
+
+function buildQuickBtns() {
+  const wrap = document.getElementById('quick-btns');
+  QUICK_IMAGES.forEach(img => {
+    const b = document.createElement('button');
+    b.className = 'btn btn-ghost';
+    b.style.cssText = 'padding:4px 10px;font-size:11px;font-family:var(--font-mono)';
+    b.textContent = img;
+    b.onclick = () => { document.getElementById('scan-input').value=img; runScan(); };
+    wrap.appendChild(b);
+  });
+}
+buildQuickBtns();
+
+let scanStageTimer = null;
+function animateScanStages() {
+  const stages = ['trivy','clamav','yara','falco'];
+  let i = 0;
+  stages.forEach(s => document.getElementById('stage-'+s).className='stage');
+  function next() {
+    if(i>0) document.getElementById('stage-'+stages[i-1]).className='stage done-stage';
+    if(i>=stages.length) return;
+    document.getElementById('stage-'+stages[i]).className='stage active-stage';
+    i++;
+    scanStageTimer = setTimeout(next, 1400);
+  }
+  next();
+}
+
+async function runScan() {
+  const img = document.getElementById('scan-input').value.trim();
+  if(!img) { toast('Enter an image name','error'); return; }
+
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  document.getElementById('scan-btn-text').innerHTML = '<span class="spinner"></span> Scanning';
+  document.getElementById('result-panel').classList.remove('show');
+  document.getElementById('scanning-overlay').classList.add('active');
+  animateScanStages();
+
+  const result = await api('/api/scan/sync', 'POST', {image_name: img});
+
+  clearTimeout(scanStageTimer);
+  document.getElementById('scanning-overlay').classList.remove('active');
+  document.getElementById('scan-btn-text').textContent = '▶ Scan';
+  btn.disabled = false;
+
+  if(result.error) { toast('Scan failed: '+result.error,'error'); return; }
+
+  currentResult = result;
+  renderResult(result);
+  refreshStats();
+  toast(`Scan complete — ${result.risk_category} risk`, result.risk_category==='CRITICAL'?'error':result.risk_category==='HIGH'?'error':'success');
+}
+
+function renderResult(r) {
+  document.getElementById('res-image').textContent = r.image_name;
+  const badge = document.getElementById('res-badge');
+  badge.textContent = r.risk_category;
+  badge.className = `risk-badge ${r.risk_category}`;
+  document.getElementById('res-score').textContent = r.final_risk_score;
+
+  const sc = document.getElementById('score-circle');
+  const colors={CRITICAL:'var(--crit)',HIGH:'var(--high)',MEDIUM:'var(--med)',LOW:'var(--low)'};
+  sc.style.borderColor = colors[r.risk_category]||'var(--border)';
+
+  const prog = document.getElementById('res-progress');
+  prog.style.width = r.final_risk_score+'%';
+  prog.style.background = colors[r.risk_category]||'var(--accent)';
+
+  document.getElementById('res-trivy').textContent = r.engines?.trivy?.vulnerabilities ?? '—';
+  document.getElementById('res-clamav').textContent = r.engines?.clamav?.hits ?? '—';
+  document.getElementById('res-yara').textContent = r.engines?.yara?.matches ?? '—';
+  document.getElementById('res-falco').textContent = r.engines?.falco?.alerts ?? '—';
+  document.getElementById('res-duration').textContent = `⏱ Scan completed in ${r.scan_duration}s`;
+
+  document.getElementById('result-panel').classList.add('show');
+}
+
+//DASHBOARD 
+async function loadDashboard() {
+  const stats = await api('/api/stats');
+  document.getElementById('st-total').textContent = stats.total || 0;
+  document.getElementById('st-crit').textContent = stats.CRITICAL || 0;
+  document.getElementById('st-high').textContent = stats.HIGH || 0;
+  document.getElementById('st-med').textContent = stats.MEDIUM || 0;
+  document.getElementById('st-low').textContent = stats.LOW || 0;
+  document.getElementById('st-avg').textContent = stats.avg_score || '—';
+
+  const logs = await api('/api/scans');
+  scanLogs = logs;
+  const tbody = document.getElementById('dashboard-tbody');
+  document.getElementById('recent-count').textContent = logs.length + ' results';
+  if(!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No scans yet. Run a scan to see results here.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.slice(0,10).map(r => rowHTML(r)).join('');
+}
+
+async function refreshStats() {
+  const logs = await api('/api/scans');
+  scanLogs = logs;
+  const stats = await api('/api/stats');
+  document.getElementById('st-total').textContent = stats.total || 0;
+  document.getElementById('st-crit').textContent = stats.CRITICAL || 0;
+  document.getElementById('st-high').textContent = stats.HIGH || 0;
+  document.getElementById('st-med').textContent = stats.MEDIUM || 0;
+  document.getElementById('st-low').textContent = stats.LOW || 0;
+  document.getElementById('st-avg').textContent = stats.avg_score || '—';
+  const tbody = document.getElementById('dashboard-tbody');
+  if(logs.length) {
+    document.getElementById('recent-count').textContent = logs.length + ' results';
+    tbody.innerHTML = logs.slice(0,10).map(r=>rowHTML(r)).join('');
+  }
+}
+
+//LOGS 
+async function loadLogs() {
+  const logs = await api('/api/scans');
+  scanLogs = logs;
+  const tbody = document.getElementById('logs-tbody');
+  if(!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No scans logged yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(r => rowHTML(r)).join('');
+}
+
+function rowHTML(r) {
+  const colors = {CRITICAL:'var(--crit)',HIGH:'var(--high)',MEDIUM:'var(--med)',LOW:'var(--low)'};
+  const col = colors[r.risk_category]||'var(--text)';
+  const ts = r.timestamp ? new Date(r.timestamp).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true
+  }) : '—';
+  return `<tr onclick="openModal('${r.scan_id}')">
+    <td class="td-image">${r.image_name}</td>
+    <td class="td-score" style="color:${col}">${r.final_risk_score}</td>
+    <td><span class="risk-badge ${r.risk_category}">${r.risk_category}</span></td>
+    <td style="color:var(--high)">${r.engines?.trivy?.vulnerabilities ?? '—'}</td>
+    <td style="color:var(--crit)">${r.engines?.clamav?.hits ?? '—'}</td>
+    <td style="color:var(--accent3)">${r.engines?.yara?.matches ?? '—'}</td>
+    <td style="color:var(--accent)">${r.engines?.falco?.alerts ?? '—'}</td>
+    <td class="td-time">${r.scan_duration}s</td>
+    <td class="td-time">${ts}</td>
+    <td class="td-action" onclick="event.stopPropagation()">
+      <button class="btn btn-ghost" onclick="openModal('${r.scan_id}')">📋 Report</button>
+    </td>
+  </tr>`;
+}
+
+//MODAL
+function openModalFromResult() {
+  if(!currentResult) return;
+  renderModal(currentResult);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+async function openModal(scanId) {
+  let r = _store[scanId] || scanLogs.find(s=>s.scan_id===scanId);
+  if(!r) { r = await api('/api/scan/'+scanId); }
+  if(r.error) { toast('Report not found','error'); return; }
+  renderModal(r);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if(!e || e.target===document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function renderModal(r) {
+  document.getElementById('modal-image-name').textContent = r.image_name;
+  const badge = document.getElementById('modal-badge');
+  badge.textContent = r.risk_category;
+  badge.className = `risk-badge ${r.risk_category}`;
+
+  const colors={CRITICAL:'var(--crit)',HIGH:'var(--high)',MEDIUM:'var(--med)',LOW:'var(--low)'};
+  const col = colors[r.risk_category]||'var(--accent)';
+
+  const td = r.trivy_detail || {};
+  const fd = r.falco_detail || {};
+  const yRules = (r.yara_rules_matched||[]).map(x=>`<span class="rule-chip">${x}</span>`).join('') || '<span style="color:var(--text3);font-family:var(--font-mono);font-size:12px">None matched</span>';
+  const cSigs = (r.clamav_signatures||[]).map(x=>`<span class="sig-chip">${x}</span>`).join('') || '<span style="color:var(--text3);font-family:var(--font-mono);font-size:12px">None detected</span>';
+
+  document.getElementById('modal-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">Overview</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Risk Score</div><div class="detail-item-val" style="color:${col};font-size:22px">${r.final_risk_score} / 100</div></div>
+        <div class="detail-item"><div class="detail-item-label">Risk Category</div><div class="detail-item-val" style="color:${col}">${r.risk_category}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Scan Duration</div><div class="detail-item-val">${r.scan_duration}s</div></div>
+        <div class="detail-item"><div class="detail-item-label">Timestamp</div><div class="detail-item-val" style="font-size:11px">${r.timestamp ? new Date(r.timestamp).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true}) : '—'}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Trivy — Vulnerability Scanner</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Total CVEs</div><div class="detail-item-val" style="color:var(--high)">${r.engines?.trivy?.vulnerabilities ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Scan Duration</div><div class="detail-item-val">${r.engines?.trivy?.duration ?? '—'}s</div></div>
+        <div class="detail-item"><div class="detail-item-label">Critical</div><div class="detail-item-val" style="color:var(--crit)">${td.critical ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">High</div><div class="detail-item-val" style="color:var(--high)">${td.high ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Medium</div><div class="detail-item-val" style="color:var(--med)">${td.medium ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Low</div><div class="detail-item-val" style="color:var(--low)">${td.low ?? '—'}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">ClamAV — Malware Detection</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Malware Hits</div><div class="detail-item-val" style="color:var(--crit)">${r.engines?.clamav?.hits ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Scan Duration</div><div class="detail-item-val">${r.engines?.clamav?.duration ?? '—'}s</div></div>
+      </div>
+      <div style="margin-top:10px"><div class="detail-item-label" style="font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detected Signatures</div>
+      <div class="rule-list">${cSigs}</div></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">YARA — Rule Matching</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Rule Matches</div><div class="detail-item-val" style="color:var(--accent3)">${r.engines?.yara?.matches ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Scan Duration</div><div class="detail-item-val">${r.engines?.yara?.duration ?? '—'}s</div></div>
+      </div>
+      <div style="margin-top:10px"><div class="detail-item-label" style="font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Matched Rules</div>
+      <div class="rule-list">${yRules}</div></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Falco — Runtime Behavior Monitor</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Total Alerts</div><div class="detail-item-val" style="color:var(--accent)">${r.engines?.falco?.alerts ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Scan Duration</div><div class="detail-item-val">${r.engines?.falco?.duration ?? '—'}s</div></div>
+        <div class="detail-item"><div class="detail-item-label">Critical</div><div class="detail-item-val" style="color:var(--crit)">${fd.critical ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Error</div><div class="detail-item-val" style="color:var(--high)">${fd.error ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Warning</div><div class="detail-item-val" style="color:var(--med)">${fd.warning ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Notice</div><div class="detail-item-val" style="color:var(--low)">${fd.notice ?? '—'}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Syft — SBOM Package Inventory</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">Total Packages</div><div class="detail-item-val" style="color:var(--accent3)">${r.sbom_summary?.total_packages ?? r.engines?.syft?.total_packages ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">OS Packages</div><div class="detail-item-val">${r.engines?.syft?.os_packages ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">Library Packages</div><div class="detail-item-val">${r.engines?.syft?.lib_packages ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">High-Risk Licenses</div><div class="detail-item-val" style="color:${(r.sbom_summary?.high_risk_licenses||[]).length>0?'var(--crit)':'var(--low)'}">${(r.sbom_summary?.high_risk_licenses||[]).join(', ')||'None'}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Dockle — CIS Docker Benchmark</div>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-item-label">FATAL</div><div class="detail-item-val" style="color:var(--crit)">${r.engines?.dockle?.fatal ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">WARN</div><div class="detail-item-val" style="color:var(--high)">${r.engines?.dockle?.warn ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">INFO</div><div class="detail-item-val" style="color:var(--med)">${r.engines?.dockle?.info ?? '—'}</div></div>
+        <div class="detail-item"><div class="detail-item-label">PASS</div><div class="detail-item-val" style="color:var(--low)">${r.engines?.dockle?.pass ?? '—'}</div></div>
+      </div>
+      ${(r.dockle_findings||[]).length ? `<div style="margin-top:10px">
+        ${(r.dockle_findings||[]).filter(f=>f.level==='FATAL').map(f=>`
+          <div style="background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px">
+            <span style="color:var(--crit);font-family:var(--font-mono);font-size:10px">${f.code}</span>
+            <span style="color:var(--text2);margin-left:8px">${f.title}</span>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Scan ID</div>
+      <div style="background:var(--surface2);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text2)">${r.scan_id}</div>
+    </div>
+  `;
+}
+
+//DATASET 
+async function loadDataset() {
+  const data = await api('/api/dataset');
+  const grid = document.getElementById('dataset-grid');
+  grid.innerHTML = data.map(d=>`
+    <div class="dataset-card" onclick="scanFromDataset('${d.name}')">
+      <div class="dataset-card-top">
+        <div class="dataset-card-name">${d.name}</div>
+        <span class="label-badge ${d.label}">${d.label}</span>
+      </div>
+      <div class="dataset-desc">${d.description}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="dataset-cat">${d.category}</div>
+        ${d.dockerfile ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">${d.dockerfile}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function scanFromDataset(name) {
+  document.getElementById('scan-input').value = name;
+  nav('scan');
+  setTimeout(runScan, 100);
+}
+
+//INIT 
+loadDashboard();
+loadDataset();
+</script>
+</body>
+</html>
+

@@ -1,48 +1,149 @@
+#!/usr/bin/env python3
+"""
+ClamAV Scanner - FIXED VERSION
+Scans Docker images for malware using ClamAV
+"""
+
 import subprocess
+import tempfile
+import shutil
+import logging
+import sys
 import os
+from pathlib import Path
+from typing import Dict
 
-def scan_with_clamav(image_name):
-    """Scan extracted Docker image with ClamAV"""
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def run_clamav_scan(image_name: str, timeout: int = 600) -> Dict:
+    """
+    Scan Docker image with ClamAV
+    
+    Args:
+        image_name: Docker image to scan
+        timeout: Scan timeout in seconds
+        
+    Returns:
+        Dictionary with scan results
+    """
+    logger.info(f"[clamav] Scanning {image_name}")
+    
+    temp_dir = None
+    
     try:
-        # Define paths (Same naming convention as YARA)
-        tar_file = f'/tmp/{image_name.replace(":", "_")}.tar'
-        extract_path = f'/tmp/{image_name.replace(":", "_")}_extracted'
+        # Create temp directory
+        temp_base = os.path.expanduser('~/maldocker_temp')
+        Path(temp_base).mkdir(parents=True, exist_ok=True)
         
-        # 1. Check if image is already extracted (by YARA?)
-        if not os.path.exists(extract_path):
-            print(f"[ClamAV] Image not found locally. Extracting {image_name}...")
+        temp_dir = tempfile.mkdtemp(prefix='clamav_scan_', dir=temp_base)
+        
+        # Export container filesystem
+        tar_path = Path(temp_dir) / 'image.tar'
+        
+        try:
+            subprocess.run(
+                ['docker', 'save', image_name, '-o', str(tar_path)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"[clamav] Docker save failed: {e.stderr}")
+            return {
+                'success': False,
+                'threat_count': 0,
+                'threats': [],
+                'error': f'Docker save failed: {e.stderr}'
+            }
+        
+        # Extract tar
+        extract_dir = Path(temp_dir) / 'extracted'
+        extract_dir.mkdir(exist_ok=True)
+        
+        try:
+            subprocess.run(
+                ['tar', '-xf', str(tar_path), '-C', str(extract_dir)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"[clamav] Tar extraction failed: {e.stderr}")
+            return {
+                'success': False,
+                'threat_count': 0,
+                'threats': [],
+                'error': f'Tar extraction failed'
+            }
+        
+        # Run ClamAV scan
+        try:
+            result = subprocess.run(
+                ['clamscan', '-r', '--no-summary', str(extract_dir)],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False
+            )
             
-            # Save and Extract (Backup logic if YARA didn't run)
-            subprocess.run(['docker', 'save', image_name, '-o', tar_file], check=True, timeout=60)
-            os.makedirs(extract_path, exist_ok=True)
-            subprocess.run(['tar', '-xf', tar_file, '-C', extract_path], check=True)
-            # os.remove(tar_file) # Optional cleanup
-        else:
-            print(f"[ClamAV] Using existing extracted files at {extract_path}...")
-
-        print(f"[ClamAV] Scanning files for viruses...")
-        
-        # 2. Run ClamScan
-        # -r: Recursive (scan all subfolders)
-        # -i: Infected only (only print infected files)
-        # --no-summary: Keep output clean
-        result = subprocess.run(
-            ['clamscan', '-r', '-i', extract_path],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        
-        # 3. Analyze Output
-        output = result.stdout.strip()
-        is_infected = "FOUND" in output
-        
-        return {
-            'status': 'success',
-            'output': output if output else "No threats found",
-            'infected': is_infected
-        }
-
+            # Parse ClamAV output
+            threats = []
+            if result.stdout:
+                for line in result.stdout.split('\n'):
+                    if 'FOUND' in line:
+                        threats.append(line.strip())
+            
+            threat_count = len(threats)
+            logger.info(f"[clamav] {threat_count} hits in {image_name}")
+            
+            return {
+                'success': True,
+                'threat_count': threat_count,
+                'threats': threats,
+                'error': None
+            }
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"[clamav] Scan timeout after {timeout}s")
+            return {
+                'success': False,
+                'threat_count': 0,
+                'threats': [],
+                'error': f'ClamAV scan timeout'
+            }
+    
     except Exception as e:
-        print(f"[ClamAV Error] {e}")
-        return {'status': 'error', 'message': str(e)}
+        logger.error(f"[clamav] Error: {str(e)}")
+        return {
+            'success': False,
+            'threat_count': 0,
+            'threats': [],
+            'error': str(e)
+        }
+    
+    finally:
+        # Cleanup
+        if temp_dir and Path(temp_dir).exists():
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                pass
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python3 clamav_scan.py <image_name>")
+        sys.exit(1)
+    
+    image = sys.argv[1]
+    
+    result = run_clamav_scan(image)
+    
+    print(f"Success: {result['success']}")
+    print(f"Threats Found: {result['threat_count']}")
+    if result['error']:
+        print(f"Error: {result['error']}")
