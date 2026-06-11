@@ -1,0 +1,75 @@
+#  Python 
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Secrets / local config 
+.env
+*.env
+db_password.txt
+
+#  Backup files 
+*.backup_*
+*.bak_*
+*.py.backup_*
+*.py.bak_*
+
+# Scan outputs 
+output/
+evaluation/2*/
+evaluation_log.txt
+scan_*.json
+/scan_*.json
+
+# ML model artifacts
+ml_model/rf_model.pkl
+ml_model/*.pkl
+
+# Logs
+logs/
+*.log
+
+# OS / editor cruft 
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Docker test artifacts
+maldocker_temp/
+apply_labels_to_results.py
+relabel_dataset.py
+fix_csv_and_cleanup.py
+batch_scan.py
+health_check.py
+scripts/
+
+# Superseded / legacy files present in tree
+app/app.py
+app/scan_image.py
+ml_model/old_train_classifier.py
+ml_model/export_dataset.py
+datasets_manager.py
+init_db.sql
+data/
+check_scanners.sh
+
+# Generated ML reports 
+ml_model/ml_metrics.txt
+ml_model/feature_importance.txt
+ 
+*.catbak_*
+fix_category_cutoffs.py
+
+secure_credentials.py
+app/dashboard.py.catbak_1781169754
+app/dashboard.py.mockbak_1781186678
+app/dashboard.py.backup_1780844689
+app/dashboard.py.secbak_1781208547
+

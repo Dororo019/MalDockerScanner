@@ -1,0 +1,63 @@
+# .github/workflows/deploy-pages.yml
+# ════════════════════════════════════════════════════════════════════
+# Deploys dashboard_standalone.html to GitHub Pages
+# Your dashboard is then publicly accessible at:
+#   https://YOUR_USERNAME.github.io/malicious-docker-images-scanner/
+#
+# The standalone HTML auto-connects to your Render Flask server.
+# ════════════════════════════════════════════════════════════════════
+
+name: Deploy Dashboard to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard_standalone.html"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Pages directory
+        run: |
+          mkdir -p _site
+
+          # Copy the dashboard as index.html so it loads at the root URL
+          cp dashboard_standalone.html _site/index.html
+
+          # Inject your Render server URL as the default so visitors
+          # don't need to set it manually
+          sed -i "s|http://localhost:5000|https://maldocker.onrender.com|g" _site/index.html
+
+          echo "Pages ready:"
+          ls -la _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
