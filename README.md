@@ -16,7 +16,8 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
 |:---:|:---:|
 | ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) |
 | **Images Samples (Datasets)** | **History (Scan_Logs)** |
-![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
+|:---:|:---:|
+|![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
 
 ---
 
