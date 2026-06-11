@@ -12,9 +12,11 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
 4.  **Aggregates** all findings into a single **Risk Score (0-100)**.
 
 ## 📸 Examples of GUI:
-| **Critical Risk Alert (Web UI)** | **Build Process (Terminal)** |
+| **Web Dashboard (Web UI)** | **Build Process (Terminal)** |
 |:---:|:---:|
-| ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) ![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
+| ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) |
+| **Images Samples (Datasets)** | **History (Scan_Logs)** |
+![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
 
 ---
 
