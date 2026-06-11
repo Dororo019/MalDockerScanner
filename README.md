@@ -15,6 +15,7 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
 | **Web Dashboard (Web UI)** | **Build Process (Terminal)** |
 |:---:|:---:|
 | ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) |
+
 | **Images Samples (Datasets)** | **History (Scan_Logs)** |
 |:---:|:---:|
 |![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
@@ -28,6 +29,8 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
     * **YARA:** Scans files for custom malware patterns (e.g., specific strings).
     * **ClamAV:** Scans for known virus signatures.
     * **Falco:** Monitors runtime system calls (e.g., unexpected shell usage).
+    * **Syft:**
+    * **Dockle:**
 * **Smart Risk Scoring:**
     * Calculates a normalized score (0-100).
     * **Critical Risk (100):** If *any* malware signature is found.
@@ -45,26 +48,86 @@ The scanner operates in a 4-step hybrid pipeline.
 
 ```mermaid
 graph TD
-    User[User Input] -->|Image Name| API[Backend Engine]
-    API --->|Step 1: Save & Extract| Static[Static Analysis]
-    API --->|Step 2: Run & Monitor| Dynamic[Dynamic Analysis]
+    %% Styling Configuration
+    classDef default font-family:DejaVu Sans,sans-serif,font-size:14px,stroke-width:1.5px;
     
-    subgraph "Static Scanners"
-        Static --> Trivy
-        Static --> YARA
-        Static --> ClamAV
+    %% Nodes and Flow
+    User([User / Security Analyst]) --> Dashboard[Flask Web Application<br>• Vulnerability Scan Interface<br>• Evaluation History View]
+    
+    subgraph DataStore ["Data Persistence Layer"]
+        Postgres[(PostgreSQL Database<br>• User Credentials<br>• Historic Scan Logs<br>• Exploit Mapping Metadata)]
+    end
+    Dashboard <--> Postgres
+
+    Dashboard --> Orchestrator[Scan Orchestrator Engine<br>• Automated Image Pulling<br>• Parallel Workflow Worker]
+
+    %% THE FIXED PARENT CONTAINER: Engines explicitly encapsulates both sub-suites
+    subgraph Engines ["Multi-Engines Scanner"]
+        direction TB
+        
+        subgraph StaticSuite ["Static Analysis Engines"]
+            direction LR
+            Trivy[Trivy<br>OS/Pkg CVEs] --- Syft[Syft<br>SBM Generation] --- ClamAV[ClamAV<br>Malware Signatures] --- YARA[YARA<br>Pattern Match] --- Dockle[Dockle<br>Best Practices]
+        end
+
+        subgraph DynamicSuite ["Dynamic Engine"]
+            Falco[Falco Anomaly Monitor<br>Runtime System Calls]
+        end
+    end
+
+    %% Direct flow from Orchestrator into the parallel engine subsystems
+    Orchestrator --> StaticSuite
+    Orchestrator --> DynamicSuite
+
+    Scoring[Three-Layer Contextual Scoring Framework]
+    Verdict([Composite Risk Index & Verdict<br>LOW / MEDIUM / HIGH / CRITICAL])
+
+    StaticSuite --> Scoring
+    DynamicSuite --> Scoring
+    Scoring --> Verdict
+
+    Verdict -.-> |Asynchronous Update| Postgres
+    Verdict -.-> Collected[Aggregated Evaluation Matrix]
+    
+    subgraph OfflineRes ["Offline Research & Analytical Validation"]
+        RF[Random Forest Machine Learning Model]
+        Contribution[Feature Importance Attributes]
+        Benchmark[Detection Performance Benchmarks<br>Precision · Recall · F1-Score]
+        
+        RF --> Contribution
+        RF --> Benchmark
     end
     
-    subgraph "Dynamic Scanners"
-        Dynamic --> Falco
-    end
+    Collected --> RF
+
+    %% --- Synthesis Theme Customization ---
+    style User fill:#34495e,stroke:#2c3e50,color:#fff
+    style Dashboard fill:#2980b9,stroke:#2471a3,color:#fff
+    style Postgres fill:#2c3e50,stroke:#1a252f,color:#fff
+    style Orchestrator fill:#16a085,stroke:#117a65,color:#fff
     
-    Trivy --> Aggregator[Risk Aggregator]
-    YARA --> Aggregator
-    ClamAV --> Aggregator
-    Falco --> Aggregator
+    %% The Large Outer Master Rectangle (Slightly deeper pale gray for better contrast)
+    style Engines fill:#f1f5f9,stroke:#60a917,stroke-width:2.5px,color:#000
     
-    Aggregator -->|Score & Alerts| Report[Analysis Report]
+    %% CHANGED: Tinted background fills to replace plain solid white
+    style StaticSuite fill:#e6f2ff,stroke:#b0c4de,stroke-width:1.5px,color:#333
+    style DynamicSuite fill:#fff5eb,stroke:#f5b041,stroke-width:1.5px,color:#333
+
+    %% Tool Element Nodes
+    style Trivy fill:#ffffff,stroke:#95a5a6,color:#333
+    style Syft fill:#ffffff,stroke:#95a5a6,color:#333
+    style ClamAV fill:#ffffff,stroke:#95a5a6,color:#333
+    style YARA fill:#ffffff,stroke:#95a5a6,color:#333
+    style Dockle fill:#ffffff,stroke:#95a5a6,color:#333
+    style Falco fill:#e67e22,stroke:#d35400,color:#fff
+    
+    %% Evaluation and Analytics
+    style Scoring fill:#27ae60,stroke:#1e8449,color:#fff
+    style Verdict fill:#196f3d,stroke:#145a32,color:#fff
+    style OfflineRes fill:#fdf2e9,stroke:#f5b041
+    style RF fill:#d35400,stroke:#a04000,color:#fff
+    style Contribution fill:#e67e22,stroke:#ba4a00,color:#fff
+    style Benchmark fill:#e67e22,stroke:#ba4a00,color:#fff
 ```
 ## 💻 Installation & Setup
 **Recommended Environment:**
