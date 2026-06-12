@@ -9,7 +9,7 @@ The end result? A single risk score from 0 to 100, and a clear verdict: pass or 
 **The scanner runs your image through four stages:** 
 1.  Pull the image and **extracts** its file system
 2.  **Scans** for hidden malware, viruses, signatures, CVEs, and secrets (Static Analysis).
-3.  **Executes or  Boot ** the container in a sandbox to watch for suspicious behavior (Dynamic Analysis).
+3.  **Executes** or  **Boot** the container in a sandbox to watch for suspicious behavior (Dynamic Analysis).
 4.  **Aggregates** all findings into a single **Risk Score (0-100)** and **Final verdict(Low/Medium/High/Critical)**.
 
 Nothing you need to stitch together manually or go to each tool and check its vulnerabilities, it's all automated through a web dashboard.
