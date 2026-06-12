@@ -45,6 +45,21 @@ Nothing you need to stitch together manually or go to each tool and check its vu
 
 
 ---
+## 📝How the pipeline works:
+* **Step 1: Click-it off**
+       Enter an image name in the dashboard. Then the orchestrator  will automatically pull it and queue it up for scanning.
+   **Step 2: Two scans run in parallel**
+        While the static scanners (Trivy, Syft, ClamAV, YARA, Dockle) comb through the image at rest, Falco boots the container in a sandbox and watches what it actually does at runtime. Both tracks run simultaneously.
+   Step 3: Everything gets scored*
+      Results from both tracks feed into the scoring framework, which normalizes the data and produces a single risk verdict — Low, Medium, High, or Critical. The result is saved to the database and formatted for the dashboard.
+   Step 4: ML validates the whole thing:*
+      The aggregated results are passed to a Random Forest model that goes beyond just scoring; it identifies which factors actually drove the risk and benchmarks the framework's overall accuracy using Precision, Recall, and F1-Score.
+
+* **Web Dashboard:**
+    * Simple UI to input `image_name:version_tag`.(e.g., Ubuntu:22.04 )
+    * Real-time scanning status.
+    * "Low/Medium/High/Critical"  verdict will give you how safe/malicious the image is.
+---
 
 ## ⚙️ System Architecture
 
@@ -133,20 +148,7 @@ graph TD
     style Contribution fill:#e67e22,stroke:#ba4a00,color:#fff
     style Benchmark fill:#e67e22,stroke:#ba4a00,color:#fff
 ```
-* **How the pipeline works:**
-   Step 1: Click it off
-       Enter an image name in the dashboard. Then the orchestrator  will automatically pull it and queue it up for scanning.
-   Step 2: Two scans run in parallel
-        While the static scanners (Trivy, Syft, ClamAV, YARA, Dockle) comb through the image at rest, Falco boots the container in a sandbox and watches what it actually does at runtime. Both tracks run simultaneously.
-   Step 3: Everything gets scored*
-      Results from both tracks feed into the scoring framework, which normalizes the data and produces a single risk verdict — Low, Medium, High, or Critical. The result is saved to the database and formatted for the dashboard.
-   Step 4: ML validates the whole thing:*
-      The aggregated results are passed to a Random Forest model that goes beyond just scoring; it identifies which factors actually drove the risk and benchmarks the framework's overall accuracy using Precision, Recall, and F1-Score.
 
-* **Web Dashboard:**
-    * Simple UI to input `image_name:version_tag`.(e.g., Ubuntu:22.04 )
-    * Real-time scanning status.
-    * "Low/Medium/High/Critical"  verdict will give you how safe/malicious the image is.
       
 ## 💻 Installation & Setup
 **Recommended Environment:**
