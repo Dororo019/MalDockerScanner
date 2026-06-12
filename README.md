@@ -18,7 +18,7 @@ Nothing you need to stitch together manually or go to each tool and check its vu
 
 | Web Dashboard (Web UI) | Run Scan(enter image_name) |
 |:---:|:---:|
-| ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) |
+| ![Dashboard](dashboard.png) | ![Scan](scan_dash.png) |
 
 | Images Samples (Datasets) | History (Scan Logs) |
 |:---:|:---:|
