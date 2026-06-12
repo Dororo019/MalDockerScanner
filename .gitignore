@@ -73,3 +73,4 @@ app/dashboard.py.mockbak_1781186678
 app/dashboard.py.backup_1780844689
 app/dashboard.py.secbak_1781208547
 
+*.mockbak_*
