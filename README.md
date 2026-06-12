@@ -14,14 +14,15 @@ The end result? A single risk score from 0 to 100, and a clear verdict: pass or 
 
 Nothing you need to stitch together manually or go to each tool and check its vulnerabilities, it's all automated through a web dashboard.
 
-## 📸 Examples of GUI:
-| **Web Dashboard (Web UI)** | **Build Process (Terminal)** |
+## Examples of GUI
+
+| Web Dashboard (Web UI) | Run Scan(enter image_name) |
 |:---:|:---:|
 | ![Dashboard](dashboard.png) | ![Scan](dashboard_scan.png) |
 
-| **Images Samples (Datasets)** | **History (Scan_Logs)** |
+| Images Samples (Datasets) | History (Scan Logs) |
 |:---:|:---:|
-|![Image Samples/Dataset](datasets_inline.png) ![History](scan_logs_history.png) |
+| ![Image Samples/Dataset](datasets_inline.png) | ![History](scan_logs_history.png) |
 
 ---
 
