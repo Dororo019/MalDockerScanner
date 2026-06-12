@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: docker_security
       POSTGRES_USER: docker_security_logs
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-malDocker2024!Secure}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-CHANGE_ME_IN_ENV}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init_database.sql:/docker-entrypoint-initdb.d/init.sql
@@ -36,7 +36,7 @@ services:
       DB_PORT: 5432
       DB_NAME: docker_security
       DB_USER: docker_security_logs
-      DB_PASSWORD: ${DB_PASSWORD:-malDocker2024!Secure}
+      DB_PASSWORD: ${DB_PASSWORD:-CHANGE_ME_IN_ENV}
       FLASK_ENV: ${FLASK_ENV:-production}
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
     ports:
@@ -62,7 +62,7 @@ services:
     restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@maldocker.local
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-iamadmin26}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-CHANGE_ME_PGADMIN}
     ports:
       - "5050:80"
     depends_on:
