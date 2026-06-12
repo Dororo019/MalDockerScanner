@@ -45,7 +45,7 @@ Nothing you need to stitch together manually or go to each tool and check its vu
 
 
 ---
-**📝How the pipeline works:**
+***📝How the pipeline works:***
       **Step 1: Click-it off**
        Enter an image name in the dashboard. Then the orchestrator  will automatically pull it and queue it up for scanning.
       **Step 2: Two scans run in parallel**
