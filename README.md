@@ -96,7 +96,7 @@ graph TD
     subgraph OfflineRes ["Offline Research & Analytical Validation"]
         RF[Random Forest Machine Learning Model]
         Contribution[Feature Importance Attributes]
-        Benchmark[Detection Performance Benchmarks<br>Precision · Recall · F1-Score]
+        Benchmark[Detection Performance Benchmarks<br>Accuracy · Precision · Recall · F1-Score]
         
         RF --> Contribution
         RF --> Benchmark
