@@ -55,7 +55,7 @@ Nothing you need to stitch together manually or go to each tool and check its vu
 *   **Step 4: ML validates the whole thing:**
       The aggregated results are passed to a Random Forest model that goes beyond just scoring; it identifies which factors actually drove the risk and benchmarks the framework's overall accuracy using Precision, Recall, and F1-Score.
 
-* **Web Dashboard:**
+**Web Dashboard:**
     * Simple UI to input `image_name:version_tag`.(e.g., Ubuntu:22.04 )
     * Real-time scanning status.
     * "Low/Medium/High/Critical"  verdict will give you how safe/malicious the image is.
