@@ -38,10 +38,10 @@ Nothing you need to stitch together manually or go to each tool and check its vu
    
 
 * **Smart Risk Scoring:**
-* The scoring isn't just a straight average; it's weighted by severity. Calculates a normalized score (0-100).
-  *Found malware? Doesn't matter what else is clean. **Risk Score: 100, Final verdict: Critical.**
-  *High-severity CVEs or suspicious runtime behavior? You'll land in the **High or Medium** range.
-  *Everything looks fine? **Low** risk, image passes.
+  The scoring isn't just a straight average; it's weighted by severity. Calculates a normalized score (0-100).
+  Found malware? Doesn't matter what else is clean. **Risk Score: 100, Final verdict: Critical.**
+  High-severity CVEs or suspicious runtime behavior? You'll land in the **High or Medium** range.
+  Everything looks fine? **Low** risk, image passes.
 
 
 ---
@@ -63,7 +63,7 @@ Nothing you need to stitch together manually or go to each tool and check its vu
 
 ## ⚙️ System Architecture
 
-The scanner operates in a 4-step hybrid pipeline.
+**The scanner operates in a 4-step hybrid pipeline.**
 
 ```mermaid
 graph TD
