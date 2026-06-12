@@ -1,15 +1,18 @@
-# 🛡️ Hybrid Framework for Detecting Vulnerable and Malicious Docker Images
+# 🛡️Beyond the CVE: Trapping Malware and Vulnerabilities in Container Base Images
 
 ## 🧐 Overview
-Think of this tool as a **forensic scanner for Docker images**.
+**If you've ever wondered whether a Docker image you pulled from the internet is actually safe this tool is for you.
+Standard scanners like Trivy do a decent job checking for outdated packages, but they're essentially just reading the label on the box. They don't look inside. This project does both: it cracks open the image, digs through the file system, runs the container in a controlled environment, and watches what it actually does at runtime.
+The end result? A single risk score from 0 to 100, and a clear verdict: pass or block.**
 
-Most standard security tools (like Trivy) only look at the "packing list" (metadata) to identify old software versions. They do not actually open the "suitcase" to see what is inside.
+**How it works:**
+**The scanner runs your image through four stages:** 
+1.  Pull the image and **extracts** its file system
+2.  **Scans** for hidden malware, viruses, signatures, CVEs, and secrets (Static Analysis).
+3.  **Executes or  Boot ** the container in a sandbox to watch for suspicious behavior (Dynamic Analysis).
+4.  **Aggregates** all findings into a single **Risk Score (0-100)** and **Final verdict(Low/Medium/High/Critical)**.
 
-**This project changes that.** It creates a hybrid scanning pipeline that:
-1.  **Extracts** the file system from a Docker image.
-2.  **Scans** for hidden malware, viruses, and secrets (Static Analysis).
-3.  **Executes** the container in a sandbox to watch for suspicious behavior (Dynamic Analysis).
-4.  **Aggregates** all findings into a single **Risk Score (0-100)**.
+Nothing you need to stitch together manually or go to each tool and check its vulnerabilities, it's all automated through a web dashboard.
 
 ## 📸 Examples of GUI:
 | **Web Dashboard (Web UI)** | **Build Process (Terminal)** |
@@ -26,19 +29,19 @@ Most standard security tools (like Trivy) only look at the "packing list" (metad
 
 * **Multi-Scanner Integration:**
     * **Trivy:** Detects OS and package vulnerabilities (CVEs).
-    * **YARA:** Scans files for custom malware patterns (e.g., specific strings).
-    * **ClamAV:** Scans for known virus signatures.
-    * **Falco:** Monitors runtime system calls (e.g., unexpected shell usage).
-    * **Syft:**
-    * **Dockle:**
+    * **YARA:** matches against custom malware patterns (e.g., specific strings/suspicious strings in binaries).
+    * **ClamAV:** classic antivirus, checks for known virus signatures
+    * **Falco:** Monitors runtime system calls while the container runs( e.g.,catches things like unexpected shells spawning/unexpected shell usage).
+    * **Syft:** generates a Software Bill of Materials, so you know exactly what's in the image
+    * **Dockle:**  checks whether the image follows Docker security best practices
+   
+
 * **Smart Risk Scoring:**
-    * Calculates a normalized score (0-100).
-    * **Critical Risk (100):** If *any* malware signature is found.
-    * **High/Medium Risk:** Based on the severity of CVEs and runtime alerts.
-* **Web Dashboard:**
-    * Simple UI to input `image_name:version_tag`.
-    * Real-time scanning status.
-    * "Pass/Block" decision based on the final score.
+* The scoring isn't just a straight average; it's weighted by severity. Calculates a normalized score (0-100).
+  *Found malware? Doesn't matter what else is clean. **Risk Score: 100, Final verdict: Critical.**
+  *High-severity CVEs or suspicious runtime behavior? You'll land in the **High or Medium** range.
+  *Everything looks fine? **Low** risk, image passes.
+
 
 ---
 
@@ -129,9 +132,24 @@ graph TD
     style Contribution fill:#e67e22,stroke:#ba4a00,color:#fff
     style Benchmark fill:#e67e22,stroke:#ba4a00,color:#fff
 ```
+* **How the pipeline works:**
+   **Step 1 — Click it off**
+       *Enter an image name in the dashboard. Then the orchestrator  will be pulling it automatically and queues it up for scanning.
+   **Step 2 — Two scans run in parallel**
+        *While the static scanners (Trivy, Syft, ClamAV, YARA, Dockle) comb through the image at rest, Falco boots the container in a sandbox and watches what it actually does at runtime. Both tracks run simultaneously.
+   **Step 3 — Everything gets scored**
+      *Results from both tracks feed into the scoring framework, which normalizes the data and produces a single risk verdict — Low, Medium, High, or Critical. The result is saved to the database and formatted for the dashboard.
+**Step 4 — ML validates the whole thing:**
+      *The aggregated results are passed to a Random Forest model that goes beyond just scoring; it identifies which factors actually drove the risk and benchmarks the framework's overall accuracy using Precision, Recall, and F1-Score.
+
+* **Web Dashboard:**
+    * Simple UI to input `image_name:version_tag`.(e.g., Ubuntu:22.04 )
+    * Real-time scanning status.
+    * "Low/Medium/High/Critical"  verdict will give you how safe/malicious the image is.
+      
 ## 💻 Installation & Setup
 **Recommended Environment:**
-Ubuntu 20.04/22.04 LTS (Virtual Machine or Native).\
+You'll need Ubuntu 20.04 or 22.04 — either a VM or a native install. Some tools here (especially Falco) are Linux-only and won't work properly on Windows or standard WSL2.
 Note: This project relies on Linux-specific tools (Falco, ClamAV) and is optimized for Linux environments.
 ### 1. System Prerequisites
 Run the following commands in your Ubuntu terminal to install the necessary engines:
@@ -140,7 +158,7 @@ Run the following commands in your Ubuntu terminal to install the necessary engi
 sudo apt-get update
 
 # Install ClamAV & YARA (Antivirus & Pattern Matching)
-#libyara-dev' is required for the Python YARA library to work correctly
+#note: libyara-dev is needed for the Python binding to work
 sudo apt-get install clamav clamav-daemon yara libyara-dev -y
 
 # Install Trivy (Vulnerability Scanner)
@@ -151,7 +169,7 @@ echo deb [https://aquasecurity.github.io/trivy-repo/deb](https://aquasecurity.gi
 sudo apt-get update
 sudo apt-get install trivy
 
-# Ensure Docker is installed and running
+# Make sure Docker is installed and running
 sudo systemctl start docker
 sudo usermod -aG docker $USER
 ```
@@ -183,7 +201,7 @@ The application will start on http://localhost:5000.
 The scanner can analyze **any** Docker image present on your system (pulled from Docker Hub or built locally).
 
 **Example: Scanning the official Nginx image**
-1.  Pull the image first:
+1.  Pull whatever image you want first:
     ```bash
     docker pull nginx:latest
     ```
@@ -192,39 +210,47 @@ The scanner can analyze **any** Docker image present on your system (pulled from
     ```text
     nginx:latest
     ```
-4.  Click **Initialize Scan**. The tool will extract the file system and run all checks (Trivy, YARA, ClamAV, Falco).
+    into the input field, and hit **Initialize Scan**. The tool takes it from there.The tool will extract the file system and run all checks (Trivy, YARA, ClamAV, Falco....).
 
 ### 2. Scanning Custom/Local Images
-You can also scan images you have built yourself. Just ensure the image exists in your local registry by running `docker images`.
+You can also scan images you have built yourself. Just ensure the image exists in your local registry by running  `docker images` or as long as the image shows up in there.you can scan it the same way; just enter the name and tag.
+
 
 ---
 
-## 🧪 How to Test (Proof of Concept)
-To prove the efficacy of the scanner, we have created custom "Dangerous" images that mimic real-world threats.
-
-1. Build the Malware Test Image (Signature-based) This image contains the EICAR test string, which triggers YARA/ClamAV.
+## 🧪 Want to see it catches something
+To prove the efficacy of the scanner, we have created custom images that mimic real-world threats.
+One of the test images specifically to trigger the scanner so you can verify it's actually working.
+Test 1 — Signature detection (contains the EICAR test string, which trips ClamAV and YARA):
 ```bash
-# Run inside /malware_test folder
-docker build -f Dockerfile.signature -t dangerous-test-image:latest .
+# Run this from inside the /malware_test folder
+docker build -f Dockerfile.poisoned -t scanner-test:poisoned.
 ```
-2. Build the Behavior Test Image (Runtime-based) This image runs a script mimicking a crypto-miner, which triggers Falco.
+Scan scanner-test:poisoned → you should get CRITICAL, with a score of 77 .
 
+Test 2 — Behavior detection (runs a script that mimics a crypto-miner, which Falco catches):
 ```bash
-# Run inside /malware_test folder
 docker build -f Dockerfile.behavior -t dangerous-behavior:latest .
 ```
-3. Scan them!
-* Go to http://localhost:5000.
-* Scan dangerous-test-image:latest $\rightarrow$ Result: CRITICAL (Score: 100).
-* Scan dangerous-behavior:latest $\rightarrow$ Result: HIGH RISK.
-* Scan other images as well by following the same steps such as by entering the image name and the respective tag version.
+Scan dangerous-behavior:latest → you should get HIGH RISK.
+
+* Scan other images as well by following the same steps, such as by entering the image name and the respective tag version.
 
 ## 📁 Project Structure
-* app/: Flask web server and UI templates.
-* static_scan/: Scripts for Trivy, YARA, and ClamAV logic.
+* app/: Web dashboard (Flask) and HTML templates.
+* static_scan/: Trivy, YARA, and ClamAV logic.
 * dynamic_scan/: Scripts for running the container and parsing Falco logs.
-* ml_model/: Logic for Risk Score calculation.
-* malware_test/: Dockerfiles for creating test data.
+* ml_model/: Risk Score calculation.
+* malware_test/: The test Dockerfiles for demos and validation
+
+## 🔧 Troubleshooting
+
+* **Error: `docker: permission denied`**
+    * **Fix:** Your user isn't in the docker group yet. Run `sudo usermod -aG docker $USER` and log out and back in (or reboot the VM).
+    * **Fix:** You're probably on Windows or WSL2. Make sure you are running on a Linux host/VM.  Falco needs direct kernel access; it won't work without a proper Linux host or VM.
+* **Scanner hangs on "Pulling image..."**
+    * **Fix:** Docker needs a stable internet connection to download image layers. Check your network and try again. Also, sometimes it occurs due to the timeframe we set for analysis. You may change it or else just reduce the falco scan timer.
+
 
 ## References
 
@@ -256,11 +282,3 @@ docker build -f Dockerfile.behavior -t dangerous-behavior:latest .
 15. GitHub - anchore/syft: CLI tool and library for generating a Software Bill of Materials from container images.
 16. ClamAV: Open-Source Antivirus Software Toolkit for UNIX (Cisco Talos Intelligence Group).
 
-## 🔧 Troubleshooting
-
-* **Error: `docker: permission denied`**
-    * **Fix:** Run `sudo usermod -aG docker $USER` and restart your VM (or log out/in).
-* **Error: `Falco: kernel module not found`**
-    * **Fix:** Ensure you are running on a Linux host/VM. Falco does not support standard Windows/WSL2 kernels natively without specific tuning.
-* **Scanner hangs on "Pulling image..."**
-    * **Fix:** Check your internet connection. Docker Hub requires a stable network to download new layers.
