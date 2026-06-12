@@ -84,7 +84,7 @@ graph TD
     Orchestrator --> DynamicSuite
 
     Scoring[Three-Layer Contextual Scoring Framework]
-    Verdict([Composite Risk Index & Verdict<br>LOW / MEDIUM / HIGH / CRITICAL])
+    Verdict([Composite Risk Index & Final Verdict<br>LOW / MEDIUM / HIGH / CRITICAL])
 
     StaticSuite --> Scoring
     DynamicSuite --> Scoring
